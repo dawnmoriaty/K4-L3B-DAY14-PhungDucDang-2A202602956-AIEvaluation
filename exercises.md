@@ -2,6 +2,9 @@
 
 ## AI Evaluation & Benchmarking · Lab Worksheet
 
+**Học viên:** Phùng Đức Đăng | **MSSV:** 2A202602956  
+**Repository:** `https://github.com/dawnmoriaty/K4-L3B-PhungDucDang-2A202602956-AIEvaluation`
+
 **Thời gian làm bài:** 9:15–12:00
 
 **Domain:** OrbitTech Store Customer Support

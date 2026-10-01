@@ -1,5 +1,8 @@
 # Day 14 — Reflection
 
+**Học viên:** Phùng Đức Đăng | **MSSV:** 2A202602956  
+**Repository:** `https://github.com/dawnmoriaty/K4-L3B-PhungDucDang-2A202602956-AIEvaluation`
+
 ## Evaluation Report & Failure Analysis
 
 Dùng kết quả thật trong `artifacts/benchmark_results.json` và kiểm tra lại

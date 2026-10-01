@@ -1,5 +1,12 @@
 # Hướng dẫn nộp bài (SUBMISSION)
 
+**Thông tin bài nộp:**
+- **Họ và tên:** Phùng Đức Đăng
+- **MSSV:** 2A202602956
+- **Repository URL:** `https://github.com/dawnmoriaty/K4-L3B-PhungDucDang-2A202602956-AIEvaluation`
+
+---
+
 ## 1. Hình thức nộp bài
 - Bài tập được thực hiện theo hình thức **cá nhân**.
 - **Mỗi cá nhân phải tự nộp link repo của mình lên hệ thống Codelab** theo thông báo của giảng viên hoặc coach (mỗi học viên một repository riêng, không nộp hộ, không dùng chung repo).
@@ -16,9 +23,9 @@ K4-L3B-<HoVaTen>-<MSSV>-AIEvaluation
 - `<HoVaTen>`: Họ và tên viết liền không dấu (PascalCase).
 - `<MSSV>`: Mã số sinh viên chính xác.
 
-**Ví dụ:**
+**Repo của bạn:**
 ```text
-K4-L3B-NguyenVanAn-L3A202600280-AIEvaluation
+K4-L3B-PhungDucDang-2A202602956-AIEvaluation
 ```
 
 > ⚠️ **Lưu ý:** Đặt sai tên repository sẽ bị trừ **5 điểm** theo quy định trong [RUBRIC.md](RUBRIC.md).
@@ -47,7 +54,7 @@ Các file sinh ra trong quá trình chạy (artifacts) là tùy chọn (optional
 
 Hãy chạy các kiểm tra sau và tích chọn đầy đủ trước khi nộp bài:
 
-- [x] Repository đã được đặt đúng tên chuẩn: `K4-L3B-<HoVaTen>-<MSSV>-AIEvaluation`.
+- [x] Repository đã được đặt đúng tên chuẩn: `K4-L3B-PhungDucDang-2A202602956-AIEvaluation`.
 - [x] Chạy `python validate_golden_dataset.py` báo `PASS`.
 - [x] Toàn bộ required tests pass khi chạy `pytest tests/ -v` (41 passed, 1 skipped nếu không làm bonus).
 - [x] `golden_dataset.json` đủ 20 QA (5 Easy + 7 Medium + 5 Hard + 3 Adversarial).
