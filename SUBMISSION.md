@@ -3,7 +3,7 @@
 **Thông tin bài nộp:**
 - **Họ và tên:** Phùng Đức Đăng
 - **MSSV:** 2A202602956
-- **Repository URL:** `https://github.com/dawnmoriaty/K4-L3B-PhungDucDang-2A202602956-AIEvaluation`
+- **Repository URL:** `https://github.com/dawnmoriaty/K4-L3B-DAY14-PhungDucDang-2A202602956-AIEvaluation`
 
 ---
 
@@ -25,7 +25,7 @@ K4-L3B-<HoVaTen>-<MSSV>-AIEvaluation
 
 **Repo của bạn:**
 ```text
-K4-L3B-PhungDucDang-2A202602956-AIEvaluation
+K4-L3B-DAY14-PhungDucDang-2A202602956-AIEvaluation
 ```
 
 > ⚠️ **Lưu ý:** Đặt sai tên repository sẽ bị trừ **5 điểm** theo quy định trong [RUBRIC.md](RUBRIC.md).
@@ -54,7 +54,7 @@ Các file sinh ra trong quá trình chạy (artifacts) là tùy chọn (optional
 
 Hãy chạy các kiểm tra sau và tích chọn đầy đủ trước khi nộp bài:
 
-- [x] Repository đã được đặt đúng tên chuẩn: `K4-L3B-PhungDucDang-2A202602956-AIEvaluation`.
+- [x] Repository đã được đặt đúng tên chuẩn: `K4-L3B-DAY14-PhungDucDang-2A202602956-AIEvaluation`.
 - [x] Chạy `python validate_golden_dataset.py` báo `PASS`.
 - [x] Toàn bộ required tests pass khi chạy `pytest tests/ -v` (41 passed, 1 skipped nếu không làm bonus).
 - [x] `golden_dataset.json` đủ 20 QA (5 Easy + 7 Medium + 5 Hard + 3 Adversarial).
