@@ -20,10 +20,32 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
-from dotenv import load_dotenv
-from openai import OpenAI, OpenAIError
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().with_name(".env"))
+except ImportError:
+    pass
 
-load_dotenv(Path(__file__).resolve().with_name(".env"))
+def _load_env_fallback() -> None:
+    env_path = Path(__file__).resolve().with_name(".env")
+    if env_path.is_file():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip("'\"")
+                if k and k not in os.environ:
+                    os.environ[k] = v
+
+_load_env_fallback()
+
+try:
+    from openai import OpenAI, OpenAIError
+except ImportError:
+    OpenAI = None
+    class OpenAIError(Exception):  # type: ignore[no-redef]
+        pass
 
 TOKEN_RE = re.compile(r"[a-z0-9]+")
 HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+")
@@ -242,11 +264,101 @@ class TextGenerator(Protocol):
     def generate(self, prompt: str) -> str: ...
 
 
+class GeminiGenerator:
+    """Direct REST generator for Google Gemini API (zero external dependencies)."""
+
+    def __init__(self, max_output_tokens: int = 300) -> None:
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        if not api_key or api_key == "your_gemini_api_key_here":
+            raise RuntimeError(
+                "GEMINI_API_KEY is missing or invalid in .env. "
+                "Please set GEMINI_API_KEY in .env."
+            )
+        self.api_key = api_key
+        self.model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+        self.max_output_tokens = max_output_tokens
+
+    def generate(self, prompt: str) -> str:
+        import urllib.request
+        import urllib.error
+
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{self.model}:generateContent?key={self.api_key}"
+        )
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.0,
+                "maxOutputTokens": self.max_output_tokens,
+            },
+        }
+        data = json.dumps(payload).encode("utf-8")
+
+        max_retries = 4
+        for attempt in range(max_retries):
+            req = urllib.request.Request(
+                url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    body = json.loads(resp.read().decode("utf-8"))
+                    candidates = body.get("candidates", [])
+                    if candidates:
+                        parts = (
+                            candidates[0].get("content", {}).get("parts", [])
+                        )
+                        if parts:
+                            text = parts[0].get("text", "").strip()
+                            if text:
+                                return text
+                    raise RuntimeError(
+                        f"Gemini ({self.model}) returned empty: {body}"
+                    )
+            except urllib.error.HTTPError as exc:
+                err_body = exc.read().decode("utf-8", errors="ignore")
+                if exc.code == 429 and attempt < max_retries - 1:
+                    # Rate-limited: parse retry delay or default to 25s
+                    wait = 25
+                    try:
+                        err_json = json.loads(err_body)
+                        for detail in err_json.get("error", {}).get("details", []):
+                            if "retryDelay" in detail:
+                                delay_str = detail["retryDelay"].rstrip("s")
+                                wait = max(int(float(delay_str)) + 2, 5)
+                    except Exception:
+                        pass
+                    print(
+                        f"  ⏳ Rate limit hit, waiting {wait}s "
+                        f"(attempt {attempt + 1}/{max_retries})...",
+                        flush=True,
+                    )
+                    time.sleep(wait)
+                    continue
+                raise RuntimeError(
+                    f"Gemini API error ({exc.code}) for model "
+                    f"'{self.model}': {err_body}"
+                ) from exc
+
+        raise RuntimeError(
+            f"Gemini rate limit exceeded after {max_retries} retries for "
+            f"model '{self.model}'."
+        )
+
+
 class OpenAIGenerator:
     def __init__(self, max_output_tokens: int = 300) -> None:
+        if OpenAI is None:
+            raise RuntimeError(
+                "The 'openai' package is not installed. "
+                "Install it or use Gemini via GEMINI_API_KEY."
+            )
         api_key = os.getenv("OPENAI_API_KEY", "").strip()
         self.model = os.getenv("OPENAI_MODEL", "").strip()
-        if not api_key:
+        if not api_key or api_key == "your_openai_api_key_here":
             raise RuntimeError("OPENAI_API_KEY is missing from .env")
         if not self.model:
             raise RuntimeError("OPENAI_MODEL is missing from .env")
@@ -264,6 +376,32 @@ class OpenAIGenerator:
         if not answer:
             raise RuntimeError("OpenAI returned an empty answer")
         return answer
+
+
+def create_generator(
+    provider: str = "auto", max_output_tokens: int = 300,
+) -> TextGenerator:
+    """Create a generator based on provider option or auto-detection from .env.
+
+    Auto-detection order:
+      1. If OPENAI_API_KEY is real → OpenAIGenerator  (grader path)
+      2. If GEMINI_API_KEY is real → GeminiGenerator  (student path)
+      3. Fall back to OpenAIGenerator (raises a clear error)
+    """
+    if provider == "gemini":
+        return GeminiGenerator(max_output_tokens=max_output_tokens)
+    if provider == "openai":
+        return OpenAIGenerator(max_output_tokens=max_output_tokens)
+
+    # --- auto ---
+    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+
+    if openai_key and openai_key != "your_openai_api_key_here":
+        return OpenAIGenerator(max_output_tokens=max_output_tokens)
+    if gemini_key and gemini_key != "your_gemini_api_key_here":
+        return GeminiGenerator(max_output_tokens=max_output_tokens)
+    return OpenAIGenerator(max_output_tokens=max_output_tokens)
 
 
 @dataclass(frozen=True)
@@ -299,7 +437,7 @@ class DomainAssistant:
         return cls(
             corpus_id,
             BM25Retriever(chunks),
-            generator if generator is not None else OpenAIGenerator(),
+            generator if generator is not None else create_generator(),
             top_k,
         )
 
@@ -489,15 +627,25 @@ def parse_args() -> argparse.Namespace:
         help="Output artifact (default: artifacts/actual_answers.json)",
     )
     parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument(
+        "--provider",
+        choices=["auto", "gemini", "openai"],
+        default="auto",
+        help="LLM provider (default: auto)",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     try:
+        generator = None
+        if args.provider != "auto":
+            generator = create_generator(provider=args.provider)
         artifact = generate_actual_answers(
             args.dataset,
             args.corpus_dir,
+            generator=generator,
             top_k=args.top_k,
             progress=lambda message: print(message, flush=True),
         )
