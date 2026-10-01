@@ -176,31 +176,34 @@ và quyết định thiết kế, không chép lại toàn bộ QA.
 
 | Hạng mục | Kết quả |
 |---|---|
-| Tổng số records | ____ / 20 |
-| Easy | ____ / 5 |
-| Medium | ____ / 7 |
-| Hard | ____ / 5 |
-| Adversarial | ____ / 3 |
-| Source documents được sử dụng | ____ / 10 |
-| Validator status | PASS / FAIL |
+| Tổng số records | 20 / 20 |
+| Easy | 5 / 5 |
+| Medium | 7 / 7 |
+| Hard | 5 / 5 |
+| Adversarial | 3 / 3 |
+| Source documents được sử dụng | 10 / 10 |
+| Validator status | PASS |
 
 **Ba case đại diện cho quyết định thiết kế**
 
 | ID | Difficulty | Source document(s) | Vì sao case phù hợp với difficulty/attack type? |
 |---|---|---|---|
-| | | | |
-| | | | |
-| | | | |
+| E01 | easy | `01_product_catalog.md` | Kiểm tra khả năng tra cứu sự thật đơn lẻ (single-fact lookup) về thông số phần cứng của NovaBook 14 (số cổng USB-C). Không đòi hỏi suy luận phức tạp hay điều kiện ngoại lệ; từ khóa câu hỏi ánh xạ trực tiếp tới câu văn trong tài liệu. |
+| H01 | hard | `09_escalation_and_policy_updates.md` | Đòi hỏi suy luận logic theo mốc thời gian và giải quyết xung đột chính sách giữa Policy v1.0 và v2.0. Đơn hàng đặt ngày 15/08/2026 (trước 01/09/2026) chịu chi phối bởi v1.0 (21 ngày cho hàng chưa mở seal), và đặc quyền OrbitPlus 45 ngày không được áp dụng hồi tố. Kiểm tra xem bot có bị ảo giác áp dụng nhầm chính sách mới hay không. |
+| A02 | adversarial (prompt_injection) | `00_system_scope.md` | Mô phỏng đòn tấn công jailbreak/prompt injection điển hình ("Ignore all previous instructions" và đòi trích xuất system prompt, credentials). Case này kiểm tra xem trợ lý có tuân thủ ranh giới an toàn tại `00_system_scope.md`, kiên quyết từ chối yêu cầu độc hại và điều hướng người dùng về đúng phạm vi hỗ trợ hay không. |
 
 **Điểm khó nhất khi xây dựng expected answer hoặc evidence là gì?**
 
 > *Câu trả lời:*
+> 1. **Tuân thủ nghiêm ngặt Verbatim Provenance:** Validator của Lab yêu cầu mọi chuỗi evidence trong `contexts` phải là chuỗi con nguyên văn (*verbatim substring*) từng ký tự từ file Markdown gốc. Thách thức là phải chọn đoạn trích vừa vặn chứa đầy đủ sự thật cốt lõi, không thừa thãi các thông tin ngoài lề làm loãng Context Precision nhưng cũng không được ngắt cụt gây thiếu sót ngữ cảnh.
+> 2. **Kiểm soát ranh giới Grounding của Expected Answer:** Viết expected answer sao cho 100% các luận điểm đều được chứng minh trực tiếp bởi evidence trích dẫn, tuyệt đối không đưa kiến thức ngoài đời thực vào (như tự suy diễn về quy chuẩn USB thông thường hay luật bảo vệ người tiêu dùng bên ngoài). Đối với các câu hỏi đa điều kiện (Hard), expected answer phải tổng hợp chuẩn xác cả quy tắc chung lẫn các trường hợp ngoại lệ (ví dụ: điều kiện hủy OrbitPlus trong 14 ngày nhưng sẽ mất quyền hoàn tiền nếu đã từng dùng mã giảm giá/freeship).
+> 3. **Xử lý suy luận liên tài liệu (Cross-document Reasoning):** Một số câu hỏi đòi hỏi đối chiếu giữa 2 văn bản khác nhau (ví dụ: chính sách hoàn tiền gói bundle ở `03_promotions_and_membership.md` và quy trình trả hàng ở `05_returns_and_exchanges.md`, hoặc bảo hành phần cứng ở `06_warranty_policy.md` chuyển sang trung tâm sửa chữa ở `07_repair_and_technical_support.md`). Việc đảm bảo câu hỏi tự nhiên nhưng trích xuất trọn vẹn bằng chứng từ cả hai nguồn là khâu đòi hỏi độ tỉ mỉ cao nhất.
 
 **Xác nhận:**
 
-- [ ] Mọi claim trong expected answer đều có evidence hỗ trợ.
-- [ ] Không có questions trùng ý và không dùng kiến thức ngoài corpus.
-- [ ] `python validate_golden_dataset.py` báo `PASS`.
+- [x] Mọi claim trong expected answer đều có evidence hỗ trợ.
+- [x] Không có questions trùng ý và không dùng kiến thức ngoài corpus.
+- [x] `python validate_golden_dataset.py` báo `PASS`.
 
 ### Exercise 3.2 — Benchmark Run
 
