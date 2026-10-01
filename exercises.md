@@ -30,11 +30,11 @@ critical.
 
 | Metric | Acceptable Low Score Scenario | Critical Low Score Scenario | Action Required |
 |---|---|---|---|
-| Faithfulness | | | |
-| Answer Relevance | | | |
-| Context Recall | | | |
-| Context Precision | | | |
-| Completeness | | | |
+| Faithfulness | Câu chào hỏi xã giao (chitchat/greetings) hoặc câu từ chối lịch sự với yêu cầu ngoài phạm vi (out-of-scope), khi không có context hỗ trợ nhưng vẫn giữ đúng vai trò hỗ trợ. | Câu trả lời bịa đặt thông số kỹ thuật sản phẩm, tự tạo mã giảm giá, hoặc hứa hẹn chính sách đổi trả/bảo hành sai sự thật so với tài liệu chính thức (`00_system_scope.md`). | Tăng cường grounding trong System Prompt (yêu cầu trích dẫn bằng chứng từ context), hạ temperature về 0, bổ sung few-shot refusal hoặc thêm guardrail kiểm duyệt hallucination trước khi phản hồi. |
+| Answer Relevance | Khách hàng hỏi câu hỏi ngoài phạm vi (chính trị, tư vấn pháp lý, bẻ khóa thiết bị) và trợ lý từ chối lịch sự kèm theo danh sách chủ đề được OrbitTech hỗ trợ. | Khách hàng hỏi trực tiếp về chính sách của OrbitTech (ví dụ: cách tra cứu đơn hàng, điều kiện trả hàng) nhưng trợ lý nói lan man về lịch sử công ty hoặc trả lời lạc đề sang sản phẩm khác. | Tinh chỉnh prompt để tập trung trả lời trực diện trọng tâm câu hỏi (direct answer first); cải thiện bước Query Rewriting hoặc phân loại ý định người dùng (Intent Classification). |
+| Context Recall | Câu hỏi tổng quát, mang tính điều hướng hỗ trợ chung không đòi hỏi phải trích xuất toàn bộ các chi tiết kỹ thuật sâu trong tài liệu. | Khách hỏi các trường hợp loại trừ bảo hành hoặc quy trình xử lý sự cố thiết bị quá nhiệt/cháy nổ (`07_repair...`), nhưng retriever bỏ sót các điều khoản quan trọng trong tài liệu. | Tăng số lượng top-k retrieved chunks, cải thiện chiến lược chunking (tăng overlap, giảm kích thước chunk quá lớn), kết hợp tìm kiếm lai (Hybrid Search: BM25 + Dense vector embeddings). |
+| Context Precision | Tài liệu trong corpus rất ngắn gọn và tập trung, chỉ có 1-2 chunks liên quan và cả hai đều đã xuất hiện ở top đầu. | Các chunks rác hoặc không liên quan bị xếp ở hạng 1-2, đẩy chunk chứa câu trả lời đúng xuống hạng 4-5 khiến LLM bị phân tâm hoặc bỏ lỡ thông tin ("Lost in the Middle"). | Bổ sung mô hình Reranking (như Cross-Encoder / Cohere Rerank) để tái xếp hạng độ liên quan của các chunks; tinh chỉnh lại embedding model cho domain công nghệ. |
+| Completeness | Khách hàng yêu cầu tóm tắt nhanh ("Nói ngắn gọn 1 câu"), trợ lý chỉ đưa ra kết luận cốt lõi mà không liệt kê toàn bộ quy trình nhiều bước. | Khách hỏi điều kiện để được đổi trả hàng trong 30 ngày nhưng trợ lý chỉ nói thời hạn mà quên nhắc điều kiện bắt buộc: "còn nguyên seal, đầy đủ hóa đơn và phụ kiện đi kèm". | Yêu cầu định dạng đầu ra có cấu trúc (Checklist format) trong prompt; kiểm tra xem retrieval đã bốc đủ context chưa (khắc phục từ phía Context Recall). |
 
 ### Exercise 1.2 — Bias trong LLM-as-a-Judge
 
@@ -47,14 +47,32 @@ Ba bias thường gặp:
 **Câu 1: Thiết kế experiment phát hiện position bias với ít nhất hai conditions.**
 
 > *Câu trả lời:*
+> - **Mục tiêu:** Đo lường xem LLM Judge có xu hướng thiên vị câu trả lời xuất hiện ở vị trí đầu tiên (Candidate A) hay không khi so sánh hai câu trả lời tương đương về chất lượng.
+> - **Tập dữ liệu:** Chọn $N \ge 30$ cặp câu trả lời ($Answer_1, Answer_2$) cho cùng một câu hỏi và ngữ cảnh.
+> - **Condition 1 (Original Order):**
+>   - Đưa vào prompt của Judge: `Candidate A = Answer_1`, `Candidate B = Answer_2`.
+>   - Ghi nhận tỷ lệ thắng của A: $P(\text{Win}_A \mid \text{Condition 1})$.
+> - **Condition 2 (Swapped Order):**
+>   - Hoán đổi vị trí: `Candidate A = Answer_2`, `Candidate B = Answer_1`.
+>   - Ghi nhận tỷ lệ thắng của A: $P(\text{Win}_A \mid \text{Condition 2})$.
+> - **Phân tích kết quả:**
+>   - Nếu không có bias: $P(\text{Win}_1 \mid C1) \approx P(\text{Win}_1 \mid C2)$ (vị trí không làm thay đổi kết quả thắng cuộc của $Answer_1$).
+>   - Nếu có Position Bias: Tỷ lệ Candidate A thắng luôn áp đảo bất kể nội dung là $Answer_1$ hay $Answer_2$.
+>   - **Biện pháp xử lý:** Áp dụng kỹ thuật Bidirectional Scoring (chạy cả hai chiều đổi chỗ rồi lấy trung bình điểm).
 
 **Câu 2: Làm thế nào giảm verbosity bias bằng rubric design?**
 
 > *Câu trả lời:*
+> 1. **Chấm điểm theo Checklist sự thật nguyên tử (Atomic Fact Rubric):** Thay vì cho điểm cảm tính tổng thể, rubric yêu cầu Judge đối chiếu từng ý chính cụ thể: có nêu đủ Fact 1, Fact 2, Fact 3 hay không. Mỗi fact đạt chuẩn được cộng điểm cố định, không phụ thuộc vào độ dài văn bản.
+> 2. **Bổ sung điều khoản phạt dông dài (Conciseness Penalty):** Quy định rõ ràng trong rubric: *"Trừ 1 điểm nếu câu trả lời chứa thông tin thừa thãi, lặp từ, hoặc vòng vo không đóng góp giá trị cho câu hỏi."*
+> 3. **Chuẩn hóa mật độ thông tin (Information Density):** Hướng dẫn Judge đánh giá tỷ lệ giữa thông tin hữu ích trên tổng số từ, ưu tiên các câu trả lời ngắn gọn, trực diện, dễ hiểu cho khách hàng OrbitTech.
 
 **Câu 3: Tại sao cần calibrate LLM judge với human labels?**
 
 > *Câu trả lời:*
+> 1. **Đảm bảo tính chân thực với nghiệp vụ (Ground Truth Alignment):** LLM Judge có thể có thiên kiến ngôn ngữ riêng hoặc hiểu sai các thuật ngữ chuyên biệt của OrbitTech Store. Nhãn dán của con người (human expert) là tiêu chuẩn vàng tối thượng để đảm bảo Judge đánh giá đúng giá trị kinh doanh.
+> 2. **Đo lường độ tin cậy bằng chỉ số định lượng:** Cần tính toán hệ số thống kê như **Cohen's Kappa** (đo lường độ nhất quán phân loại Pass/Fail) hoặc **Spearman/Pearson correlation** (độ tương quan điểm số). Nếu hệ số tương quan $< 0.7$, LLM Judge chưa đủ tin cậy để làm Quality Gate trong CI/CD.
+> 3. **Phát hiện và hiệu chỉnh Systematic Errors:** So sánh điểm của Judge với chuyên gia giúp phát hiện xem Judge đang mắc lỗi Leniency Bias (quá dễ dãi) hay Severity Bias (quá khắt khe), từ đó tinh chỉnh lại prompt và thang điểm chuẩn xác hơn.
 
 ### Exercise 1.3 — Evaluation trong CI/CD
 
@@ -62,13 +80,25 @@ Ba bias thường gặp:
 
 | Metric | Threshold | Lý do |
 |---|---:|---|
-| Faithfulness | | |
-| Answer Relevance | | |
-| Completeness | | |
+| Faithfulness | $\ge 0.70$ | Đây là chỉ số an toàn tối thượng của OrbitTech. Trợ lý tuyệt đối không được ảo giác hay bịa đặt chính sách đổi trả, bảo hành, giá cả gây rủi ro pháp lý và tổn thất tài chính trực tiếp cho cửa hàng. |
+| Answer Relevance | $\ge 0.70$ | Đảm bảo trợ lý trả lời đúng trọng tâm thắc mắc của khách, không trả lời lan man gây ức chế và làm tăng tỷ lệ khách hàng phải chuyển tiếp lên nhân viên hỗ trợ người thật. |
+| Completeness | $\ge 0.60$ | Đảm bảo câu trả lời bao quát đủ các bước thực hiện và điều kiện quan trọng (như giữ nguyên hóa đơn, điều kiện an toàn pin), đồng thời cho phép câu trả lời súc tích, ngắn gọn. |
 
 **Câu 2: Khi nào dùng offline evaluation, online evaluation và human review?**
 
 > *Câu trả lời:*
+> - **Offline Evaluation (Pre-deployment Gate):**
+>   - *Khi nào dùng:* Chạy tự động trong CI/CD pipeline trước khi merge Pull Request hoặc deploy phiên bản mới của prompt/model/pipeline RAG.
+>   - *Cách thực hiện:* Đánh giá tự động trên bộ dữ liệu chuẩn cố định (**Golden Dataset** gồm 20–100+ câu hỏi đa dạng kịch bản).
+>   - *Mục tiêu:* Phát hiện sớm các lỗi hồi quy (regression) và ngăn chặn các phiên bản bot kém chất lượng đưa ra ngoài.
+> - **Online Evaluation (Production Monitoring):**
+>   - *Khi nào dùng:* Chạy liên tục (real-time hoặc theo batch định kỳ hàng ngày) trên môi trường production khi khách hàng đang sử dụng.
+>   - *Cách thực hiện:* Lấy mẫu ngẫu nhiên từ log trò chuyện thực tế và dùng LLM Judge chấm điểm ngầm.
+>   - *Mục tiêu:* Phát hiện hiện tượng trôi dạt dữ liệu (data drift), các câu hỏi mới phát sinh ngoài tài liệu (knowledge gaps), hoặc sự suy giảm chất lượng phục vụ trong thực tế.
+> - **Human Review (Expert Audit & Dispute Resolution):**
+>   - *Khi nào dùng:* Thực hiện định kỳ hàng tuần/tháng, hoặc kích hoạt khi có sự cố nghiêm trọng (khách chấm 1 sao, khiếu nại gay gắt, hoặc điểm số rơi vào vùng xám nghi vấn $0.5 - 0.7$).
+>   - *Cách thực hiện:* Chuyên gia nghiệp vụ con người trực tiếp đọc, thẩm định và gắn nhãn lại cho các ca khó (edge cases).
+>   - *Mục tiêu:* Hiệu chỉnh lại độ chính xác của LLM Judge (calibration), giải quyết các ca mâu thuẫn và bổ sung câu hỏi mới vào Golden Dataset để nâng cấp hệ thống liên tục.
 
 ---
 
